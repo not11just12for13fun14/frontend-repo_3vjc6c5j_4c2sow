@@ -43,9 +43,9 @@ function Header({ lang, switchLang, phone, socials, elevated }) {
     <header className={`fixed top-0 inset-x-0 z-50 transition-colors duration-300 ${elevated ? 'bg-white/85 backdrop-blur border-b border-neutral-200' : 'bg-transparent'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {/* LOGO lockup placeholder */}
+          {/* Logo placeholder — replace with uploaded brand mark */}
           <a href={`/${lang}`} className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-full bg-neutral-900 text-white grid place-items-center text-xs tracking-widest">⟂</div>
+            <img src="/logo.svg" alt="Logo" className="w-9 h-9 object-contain" onError={(e)=>{e.currentTarget.replaceWith(Object.assign(document.createElement('div'),{className:'w-9 h-9 rounded-full bg-neutral-900 text-white grid place-items-center text-xs tracking-widest', innerText:'⟂'}))}} />
             <div className="leading-tight">
               <div className="text-sm font-medium tracking-wide">{lang==='ar' ? 'ستائر' : 'Curtains'}</div>
               <div className="text-[11px] text-neutral-500">{lang==='ar' ? 'تفاصيل راقية' : 'Refined Details'}</div>
@@ -123,7 +123,7 @@ function Products({ lang, products }) {
           {products.map((p, idx)=> (
             <a key={p.slug} href={`/${lang}/products/${p.slug}`} className={`group block bg-white/80 border border-neutral-200 overflow-hidden relative ${idx===0 ? 'lg:col-span-2' : ''}`}>
               <div className="aspect-[4/3] bg-neutral-200 overflow-hidden">
-                <img src={p.image} alt={p.title?.[lang] || p.title?.en} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"/>
+                <img src={p.image} alt={p.title?.[lang] || p.title?.en} loading="lazy" decoding="async" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"/>
               </div>
               <div className="p-4 flex items-center justify-between">
                 <div>
@@ -214,6 +214,16 @@ function FloatingDock({ config }){
   )
 }
 
+function Lightbox({ open, src, onClose }){
+  if(!open) return null
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center" onClick={onClose}>
+      <img src={src} alt="" className="max-w-[90vw] max-h-[85vh] object-contain" />
+      <button aria-label="Close" className="absolute top-4 right-4 text-white text-xl" onClick={onClose}>×</button>
+    </div>
+  )
+}
+
 export default function App(){
   const { lang, switchLang } = useLang()
   const [config, setConfig] = useState(null)
@@ -266,6 +276,7 @@ export default function App(){
 
 function ProductPage({ lang, switchLang, slug, config, elevated }){
   const [product, setProduct] = useState(null)
+  const [lightbox, setLightbox] = useState({ open:false, src:'' })
   useEffect(()=>{ fetch(`${BACKEND}/api/products/${slug}`).then(r=>r.json()).then(setProduct) },[slug])
   return (
     <div className="min-h-screen bg-white">
@@ -274,7 +285,7 @@ function ProductPage({ lang, switchLang, slug, config, elevated }){
         {product && (
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div className="aspect-[4/3] bg-neutral-100 overflow-hidden">
-              <img src={product.image} alt={product.title?.[lang] || product.title?.en} className="w-full h-full object-cover" />
+              <img src={product.image} alt={product.title?.[lang] || product.title?.en} className="w-full h-full object-cover"/>
             </div>
             <div className="mt-6">
               <h1 className="text-2xl sm:text-3xl font-medium">{product.title?.[lang] || product.title?.en}</h1>
@@ -289,7 +300,9 @@ function ProductPage({ lang, switchLang, slug, config, elevated }){
               {product.gallery?.length > 0 && (
                 <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {product.gallery.map((g,i)=> (
-                    <img key={i} src={g} alt="" className="w-full h-32 sm:h-40 object-cover" loading="lazy" />
+                    <button key={i} className="contents" onClick={()=>setLightbox({open:true, src:g})}>
+                      <img src={g} alt="" className="w-full h-32 sm:h-40 object-cover" loading="lazy" decoding="async"/>
+                    </button>
                   ))}
                 </div>
               )}
@@ -299,6 +312,7 @@ function ProductPage({ lang, switchLang, slug, config, elevated }){
       </main>
       <Footer />
       <FloatingDock config={config} />
+      <Lightbox open={lightbox.open} src={lightbox.src} onClose={()=>setLightbox({open:false, src:''})} />
     </div>
   )
 }
@@ -306,6 +320,7 @@ function ProductPage({ lang, switchLang, slug, config, elevated }){
 function GalleryPage({ lang, switchLang, elevated }){
   const [items, setItems] = useState([])
   const [filter, setFilter] = useState('all')
+  const [lightbox, setLightbox] = useState({ open:false, src:'' })
   useEffect(()=>{ fetch(`${BACKEND}/api/gallery`).then(r=>r.json()).then(setItems) },[])
   const filtered = useMemo(()=> filter==='all' ? items : items.filter(i=> i.category===filter), [items, filter])
   const labels = STRINGS[lang].gallery.filters
@@ -324,12 +339,15 @@ function GalleryPage({ lang, switchLang, elevated }){
           </div>
           <div className="columns-2 md:columns-3 gap-4 [column-fill:_balance]"><div className="space-y-4">
             {filtered.map((it)=> (
-              <img key={it._id} src={it.image} alt="" loading="lazy" className="w-full rounded-sm" />
+              <button key={it._id} className="contents" onClick={()=>setLightbox({open:true, src:it.image})}>
+                <img src={it.image} alt="" loading="lazy" decoding="async" className="w-full rounded-sm" />
+              </button>
             ))}
           </div></div>
         </section>
       </main>
       <Footer />
+      <Lightbox open={lightbox.open} src={lightbox.src} onClose={()=>setLightbox({open:false, src:''})} />
     </div>
   )
 }
